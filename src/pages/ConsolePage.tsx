@@ -23,14 +23,29 @@ export function ConsolePage() {
     )
   );
 
+  const wavRecorderRef = useRef<WavRecorder>(new WavRecorder({ sampleRate: 24000 }));
+  const wavStreamPlayerRef = useRef<WavStreamPlayer>(new WavStreamPlayer({ sampleRate: 24000 }));
+
   const [items, setItems] = useState<ItemType[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   const connectConversation = useCallback(async () => {
     const client = clientRef.current;
+    const wavRecorder = wavRecorderRef.current;
+    const wavStreamPlayer = wavStreamPlayerRef.current;
+
+    // Set state variables
     setIsConnected(true);
     setItems(client.conversation.getItems());
 
+    // Connect to microphone
+    await wavRecorder.begin();
+
+    // Connect to audio output
+    await wavStreamPlayer.connect();
+
+    // Connect to realtime API
     await client.connect();
     client.sendUserMessageContent([
       {
@@ -38,6 +53,8 @@ export function ConsolePage() {
         text: `Hello!`,
       },
     ]);
+
+    await wavRecorder.record((data) => client.appendInputAudio(data.mono));
   }, []);
 
   const disconnectConversation = useCallback(async () => {
@@ -45,7 +62,34 @@ export function ConsolePage() {
     setItems([]);
     const client = clientRef.current;
     client.disconnect();
+
+    const wavRecorder = wavRecorderRef.current;
+    await wavRecorder.end();
+
+    const wavStreamPlayer = wavStreamPlayerRef.current;
+    await wavStreamPlayer.interrupt();
   }, []);
+
+  const startRecording = async () => {
+    setIsRecording(true);
+    const client = clientRef.current;
+    const wavRecorder = wavRecorderRef.current;
+    const wavStreamPlayer = wavStreamPlayerRef.current;
+    const trackSampleOffset = await wavStreamPlayer.interrupt();
+    if (trackSampleOffset?.trackId) {
+      const { trackId, offset } = trackSampleOffset;
+      await client.cancelResponse(trackId, offset);
+    }
+    await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+  };
+
+  const stopRecording = async () => {
+    setIsRecording(false);
+    const client = clientRef.current;
+    const wavRecorder = wavRecorderRef.current;
+    await wavRecorder.pause();
+    client.createResponse();
+  };
 
   useEffect(() => {
     if (!isConnected) {
@@ -76,8 +120,14 @@ export function ConsolePage() {
         <button onClick={isConnected ? disconnectConversation : connectConversation}>
           {isConnected ? 'Stop Conversation' : 'Start Conversation'}
         </button>
+        {isConnected && (
+          <button onClick={isRecording ? stopRecording : startRecording}>
+            {isRecording ? 'Stop Recording' : 'Start Recording'}
+          </button>
+        )}
       </div>
     </div>
   );
+}
 }
 
