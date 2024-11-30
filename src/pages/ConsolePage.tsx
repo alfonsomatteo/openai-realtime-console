@@ -517,7 +517,7 @@ useEffect(() => {
     <div data-component="ConsolePage">
       <div className="content-top">
         <div className="content-title">
-          <img src="/openai-logomark.svg" />
+          <img src="/public/logo_cartesian_web.svg" />
           <span>realtime console</span>
         </div>
        
