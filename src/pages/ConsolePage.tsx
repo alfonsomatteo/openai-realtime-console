@@ -59,10 +59,9 @@ export function ConsolePage() {
    * If we're using the local relay server, we don't need this
    */
   const apiKey = process.env.REACT_APP_OPENAI_API_KEY || '';
-if (!apiKey) {
-  throw new Error('Missing OpenAI API Key. Please set REACT_APP_OPENAI_API_KEY.');
-}
-
+  if (!apiKey) {
+    throw new Error('Missing OpenAI API Key. Please set REACT_APP_OPENAI_API_KEY.');
+  }
 
   /**
    * Instantiate:
@@ -107,7 +106,6 @@ if (!apiKey) {
    * - coords, marker are for get_weather() function
    */
   const [items, setItems] = useState<ItemType[]>([]);
-  const [realtimeEvents, setRealtimeEvents] = useState<RealtimeEvent[]>([]);
   const [expandedEvents, setExpandedEvents] = useState<{
     [key: string]: boolean;
   }>({});
@@ -166,7 +164,6 @@ if (!apiKey) {
     // Set state variables
     startTimeRef.current = new Date().toISOString();
     setIsConnected(true);
-    setRealtimeEvents([]);
     setItems(client.conversation.getItems());
 
     // Connect to microphone
@@ -193,7 +190,6 @@ if (!apiKey) {
    */
   const disconnectConversation = useCallback(async () => {
     setIsConnected(false);
-    setRealtimeEvents([]);
     setItems([]);
     setMemoryKv({});
     setCoords({
@@ -248,38 +244,22 @@ if (!apiKey) {
   /**
    * Switch between Manual <> VAD mode for communication
    */
- useEffect(() => {
-  const client = clientRef.current;
-  const wavRecorder = wavRecorderRef.current;
-
-  // Imposta sempre la modalità VAD
-  client.updateSession({
-    turn_detection: { type: 'server_vad' },
-  });
-
-  if (client.isConnected()) {
-    wavRecorder.record((data) => client.appendInputAudio(data.mono));
-  }
-
-  // Disabilita manualmente il push-to-talk
-  setCanPushToTalk(false);
-}, []);
-
-
-  /**
-   * Auto-scroll the event logs
-   */
   useEffect(() => {
-    if (eventsScrollRef.current) {
-      const eventsEl = eventsScrollRef.current;
-      const scrollHeight = eventsEl.scrollHeight;
-      // Only scroll if height has just changed
-      if (scrollHeight !== eventsScrollHeightRef.current) {
-        eventsEl.scrollTop = scrollHeight;
-        eventsScrollHeightRef.current = scrollHeight;
-      }
+    const client = clientRef.current;
+    const wavRecorder = wavRecorderRef.current;
+
+    // Imposta sempre la modalità VAD
+    client.updateSession({
+      turn_detection: { type: 'server_vad' },
+    });
+
+    if (client.isConnected()) {
+      wavRecorder.record((data) => client.appendInputAudio(data.mono));
     }
-  }, [realtimeEvents]);
+
+    // Disabilita manualmente il push-to-talk
+    setCanPushToTalk(false);
+  }, []);
 
   /**
    * Auto-scroll the conversation logs
@@ -297,19 +277,17 @@ if (!apiKey) {
   /**
    * Set up render loops for the visualization canvas
    */
-useEffect(() => {
-  if (!isConnected) {
-    console.log('Connecting to Realtime API automatically...');
-    connectConversation()
-      .then(() => console.log('Connected successfully.'))
-      .catch((error) => {
-        console.error('Failed to auto-connect:', error);
-      });
-  }
-}, [isConnected, connectConversation]);
+  useEffect(() => {
+    if (!isConnected) {
+      console.log('Connecting to Realtime API automatically...');
+      connectConversation()
+        .then(() => console.log('Connected successfully.'))
+        .catch((error) => {
+          console.error('Failed to auto-connect:', error);
+        });
+    }
+  }, [isConnected, connectConversation]);
 
-
-  
   useEffect(() => {
     let isLoaded = true;
 
@@ -465,43 +443,6 @@ useEffect(() => {
       }
     );
 
-    // handle realtime events from client + server for event logging
-    client.on('realtime.event', (realtimeEvent: RealtimeEvent) => {
-      setRealtimeEvents((realtimeEvents) => {
-        const lastEvent = realtimeEvents[realtimeEvents.length - 1];
-        if (lastEvent?.event.type === realtimeEvent.event.type) {
-          // if we receive multiple events in a row, aggregate them for display purposes
-          lastEvent.count = (lastEvent.count || 0) + 1;
-          return realtimeEvents.slice(0, -1).concat(lastEvent);
-        } else {
-          return realtimeEvents.concat(realtimeEvent);
-        }
-      });
-    });
-    client.on('error', (event: any) => console.error(event));
-    client.on('conversation.interrupted', async () => {
-      const trackSampleOffset = await wavStreamPlayer.interrupt();
-      if (trackSampleOffset?.trackId) {
-        const { trackId, offset } = trackSampleOffset;
-        await client.cancelResponse(trackId, offset);
-      }
-    });
-    client.on('conversation.updated', async ({ item, delta }: any) => {
-      const items = client.conversation.getItems();
-      if (delta?.audio) {
-        wavStreamPlayer.add16BitPCM(delta.audio, item.id);
-      }
-      if (item.status === 'completed' && item.formatted.audio?.length) {
-        const wavFile = await WavRecorder.decode(
-          item.formatted.audio,
-          24000,
-          24000
-        );
-        item.formatted.file = wavFile;
-      }
-      setItems(items);
-    });
-
     setItems(client.conversation.getItems());
 
     return () => {
@@ -520,84 +461,9 @@ useEffect(() => {
           <img src="/logo_cartesian_web.svg" />
           <span>realtime console</span>
         </div>
-       
       </div>
       <div className="content-main">
         <div className="content-logs">
-          <div className="content-block events">
-            <div className="visualization">
-              <div className="visualization-entry client">
-                <canvas ref={clientCanvasRef} />
-              </div>
-              <div className="visualization-entry server">
-                <canvas ref={serverCanvasRef} />
-              </div>
-            </div>
-            <div className="content-block-title">events</div>
-            <div className="content-block-body" ref={eventsScrollRef}>
-              {!realtimeEvents.length && `awaiting connection...`}
-              {realtimeEvents.map((realtimeEvent, i) => {
-                const count = realtimeEvent.count;
-                const event = { ...realtimeEvent.event };
-                if (event.type === 'input_audio_buffer.append') {
-                  event.audio = `[trimmed: ${event.audio.length} bytes]`;
-                } else if (event.type === 'response.audio.delta') {
-                  event.delta = `[trimmed: ${event.delta.length} bytes]`;
-                }
-                return (
-                  <div className="event" key={event.event_id}>
-                    <div className="event-timestamp">
-                      {formatTime(realtimeEvent.time)}
-                    </div>
-                    <div className="event-details">
-                      <div
-                        className="event-summary"
-                        onClick={() => {
-                          // toggle event details
-                          const id = event.event_id;
-                          const expanded = { ...expandedEvents };
-                          if (expanded[id]) {
-                            delete expanded[id];
-                          } else {
-                            expanded[id] = true;
-                          }
-                          setExpandedEvents(expanded);
-                        }}
-                      >
-                        <div
-                          className={`event-source ${
-                            event.type === 'error'
-                              ? 'error'
-                              : realtimeEvent.source
-                          }`}
-                        >
-                          {realtimeEvent.source === 'client' ? (
-                            <ArrowUp />
-                          ) : (
-                            <ArrowDown />
-                          )}
-                          <span>
-                            {event.type === 'error'
-                              ? 'error!'
-                              : realtimeEvent.source}
-                          </span>
-                        </div>
-                        <div className="event-type">
-                          {event.type}
-                          {count && ` (${count})`}
-                        </div>
-                      </div>
-                      {!!expandedEvents[event.event_id] && (
-                        <div className="event-payload">
-                          {JSON.stringify(event, null, 2)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
           <div className="content-block conversation">
             <div className="content-block-title">conversation</div>
             <div className="content-block-body" data-conversation-content>
@@ -635,19 +501,13 @@ useEffect(() => {
                       {!conversationItem.formatted.tool &&
                         conversationItem.role === 'user' && (
                           <div>
-                            {conversationItem.formatted.transcript ||
-                              (conversationItem.formatted.audio?.length
-                                ? '(awaiting transcript)'
-                                : conversationItem.formatted.text ||
-                                  '(item sent)')}
+                            {conversationItem.formatted.text || '(item sent)'}
                           </div>
                         )}
                       {!conversationItem.formatted.tool &&
                         conversationItem.role === 'assistant' && (
                           <div>
-                            {conversationItem.formatted.transcript ||
-                              conversationItem.formatted.text ||
-                              '(truncated)'}
+                            {conversationItem.formatted.text || '(truncated)'}
                           </div>
                         )}
                       {conversationItem.formatted.file && (
@@ -661,20 +521,6 @@ useEffect(() => {
                 );
               })}
             </div>
-          </div>
-          <div className="content-actions">
-          <Toggle
-          defaultValue={'server_vad'}
-          labels={['always vad']}
-          values={['server_vad']}
-          onChange={() => {}} 
-          />
-
-
-            <div className="spacer" />
-           
-            <div className="spacer" />
-            
           </div>
         </div>
         <div className="content-right">
