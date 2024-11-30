@@ -372,34 +372,6 @@ useEffect(() => {
     };
     render();
 
-    const animationCanvasRef = useRef<HTMLCanvasElement>(null);
-
-useEffect(() => {
-  const canvas = animationCanvasRef.current;
-  if (!canvas) return;
-
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-
-  let animationFrameId: number;
-
-  const render = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#0099ff';
-    ctx.beginPath();
-    const radius = Math.random() * 30 + 20; // Randomize radius
-    ctx.arc(canvas.width / 2, canvas.height / 2, radius, 0, Math.PI * 2);
-    ctx.fill();
-    animationFrameId = requestAnimationFrame(render);
-  };
-
-  render();
-
-  return () => cancelAnimationFrame(animationFrameId);
-}, []);
-
-
-    
     return () => {
       isLoaded = false;
     };
@@ -550,10 +522,6 @@ useEffect(() => {
         </div>
        
       </div>
-        <div className="overlay-animation">
-          <canvas ref={animationCanvasRef} width={400} height={400}></canvas>
-        </div>
-      
       <div className="content-main">
         <div className="content-logs">
           <div className="content-block events">
