@@ -660,12 +660,13 @@ if (!apiKey) {
             </div>
           </div>
           <div className="content-actions">
-           <Toggle
-            defaultValue={true}
-            labels={['always vad']}
-            values={['server_vad']}
-            disabled={true}
-            />
+          <Toggle
+          defaultValue={'server_vad'}
+          labels={['always vad']}
+          values={['server_vad']}
+          onChange={() => {}} 
+          />
+
 
             <div className="spacer" />
            
