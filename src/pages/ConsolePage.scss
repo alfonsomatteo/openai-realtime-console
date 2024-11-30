@@ -12,6 +12,20 @@
     flex-shrink: 0;
   }
 
+  .overlay-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999; /* Assicura che l'overlay sia sopra tutti gli elementi */
+  pointer-events: none; /* Permette di interagire con gli elementi sotto l'overlay */
+  background: transparent;
+}
+
+
+  
+
   .spacer {
     flex-grow: 1;
   }
