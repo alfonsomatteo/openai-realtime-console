@@ -297,6 +297,19 @@ if (!apiKey) {
   /**
    * Set up render loops for the visualization canvas
    */
+useEffect(() => {
+  if (!isConnected) {
+    console.log('Connecting to Realtime API automatically...');
+    connectConversation()
+      .then(() => console.log('Connected successfully.'))
+      .catch((error) => {
+        console.error('Failed to auto-connect:', error);
+      });
+  }
+}, [isConnected, connectConversation]);
+
+
+  
   useEffect(() => {
     let isLoaded = true;
 
@@ -671,15 +684,7 @@ if (!apiKey) {
             <div className="spacer" />
            
             <div className="spacer" />
-            <Button
-              label={isConnected ? 'disconnect' : 'connect'}
-              iconPosition={isConnected ? 'end' : 'start'}
-              icon={isConnected ? X : Zap}
-              buttonStyle={isConnected ? 'regular' : 'action'}
-              onClick={
-                isConnected ? disconnectConversation : connectConversation
-              }
-            />
+            
           </div>
         </div>
         <div className="content-right">
