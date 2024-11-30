@@ -184,9 +184,8 @@ if (!apiKey) {
       },
     ]);
 
-    if (client.getTurnDetectionType() === 'server_vad') {
-      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-    }
+    await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+
   }, []);
 
   /**
@@ -249,20 +248,23 @@ if (!apiKey) {
   /**
    * Switch between Manual <> VAD mode for communication
    */
-  const changeTurnEndType = async (value: string) => {
-    const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    if (value === 'none' && wavRecorder.getStatus() === 'recording') {
-      await wavRecorder.pause();
-    }
-    client.updateSession({
-      turn_detection: value === 'none' ? null : { type: 'server_vad' },
-    });
-    if (value === 'server_vad' && client.isConnected()) {
-      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-    }
-    setCanPushToTalk(value === 'none');
-  };
+ useEffect(() => {
+  const client = clientRef.current;
+  const wavRecorder = wavRecorderRef.current;
+
+  // Imposta sempre la modalità VAD
+  client.updateSession({
+    turn_detection: { type: 'server_vad' },
+  });
+
+  if (client.isConnected()) {
+    wavRecorder.record((data) => client.appendInputAudio(data.mono));
+  }
+
+  // Disabilita manualmente il push-to-talk
+  setCanPushToTalk(false);
+}, []);
+
 
   /**
    * Auto-scroll the event logs
@@ -658,22 +660,15 @@ if (!apiKey) {
             </div>
           </div>
           <div className="content-actions">
-            <Toggle
-              defaultValue={false}
-              labels={['manual', 'vad']}
-              values={['none', 'server_vad']}
-              onChange={(_, value) => changeTurnEndType(value)}
+           <Toggle
+            defaultValue={true}
+            labels={['always vad']}
+            values={['server_vad']}
+            disabled={true}
             />
+
             <div className="spacer" />
-            {isConnected && canPushToTalk && (
-              <Button
-                label={isRecording ? 'release to send' : 'push to talk'}
-                buttonStyle={isRecording ? 'alert' : 'regular'}
-                disabled={!isConnected || !canPushToTalk}
-                onMouseDown={startRecording}
-                onMouseUp={stopRecording}
-              />
-            )}
+           
             <div className="spacer" />
             <Button
               label={isConnected ? 'disconnect' : 'connect'}
