@@ -1,28 +1,9 @@
-/**
- * Running a local relay server will allow you to hide your API key
- * and run custom logic on the server
- *
- * Set the local relay server address to:
- * REACT_APP_LOCAL_RELAY_SERVER_URL=http://localhost:8081
- *
- * This will also require you to set OPENAI_API_KEY= in a `.env` file
- * You can run it with `npm run relay`, in parallel with `npm start`
- */
-const LOCAL_RELAY_SERVER_URL: string =
-  process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || '';
-
 import { useEffect, useRef, useCallback, useState } from 'react';
-
-import { RealtimeClient } from '@openai/realtime-api-beta';
-import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
+import { X, ArrowUp, ArrowDown } from 'react-feather';
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
+import { RealtimeClient } from '@openai/realtime-api-beta';
 import { instructions } from '../utils/conversation_config.js';
 import { WavRenderer } from '../utils/wav_renderer';
-
-import { X, ArrowUp, ArrowDown } from 'react-feather';
-import { Toggle } from '../components/toggle/Toggle';
-import { Map } from '../components/Map';
-
 import './ConsolePage.scss';
 
 /**
@@ -40,16 +21,6 @@ interface Coordinates {
     value: number;
     units: string;
   };
-}
-
-/**
- * Type for all event logs
- */
-interface RealtimeEvent {
-  time: string;
-  source: 'client' | 'server';
-  count?: number;
-  event: { [key: string]: any };
 }
 
 export function ConsolePage() {
@@ -75,9 +46,8 @@ export function ConsolePage() {
     )
   );
 
-  const clientCanvasRef = useRef<HTMLCanvasElement>(null);
-  const serverCanvasRef = useRef<HTMLCanvasElement>(null);
   const eventsScrollRef = useRef<HTMLDivElement>(null);
+  const eventsScrollHeightRef = useRef(0); // Aggiunta per correggere l'errore di variabile non definita
   const startTimeRef = useRef<string>(new Date().toISOString());
 
   const [items, setItems] = useState<ItemType[]>([]);
@@ -86,9 +56,7 @@ export function ConsolePage() {
     [key: string]: boolean;
   }>({});
   const [isConnected, setIsConnected] = useState(false);
-  const [canPushToTalk, setCanPushToTalk] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
-  const [memoryKv, setMemoryKv] = useState<{ [key: string]: any }>({});
   const [coords, setCoords] = useState<Coordinates | null>({
     lat: 37.775593,
     lng: -122.418137,
@@ -117,20 +85,7 @@ export function ConsolePage() {
   }, []);
 
   /**
-   * When you click the API key
-   */
-  const resetAPIKey = useCallback(() => {
-    const apiKey = prompt('OpenAI API Key');
-    if (apiKey !== null) {
-      localStorage.clear();
-      localStorage.setItem('tmp::voice_api_key', apiKey);
-      window.location.reload();
-    }
-  }, []);
-
-  /**
-   * Connect to conversation:
-   * WavRecorder takes speech input, WavStreamPlayer output, client is API client
+   * Connect to conversation
    */
   const connectConversation = useCallback(async () => {
     const client = clientRef.current;
@@ -169,97 +124,13 @@ export function ConsolePage() {
   }, [isRecording]);
 
   /**
-   * Disconnect and reset conversation state
-   */
-  const disconnectConversation = useCallback(async () => {
-    setIsConnected(false);
-    setRealtimeEvents([]);
-    setItems([]);
-    setMemoryKv({});
-    setCoords({
-      lat: 37.775593,
-      lng: -122.418137,
-    });
-    setMarker(null);
-
-    const client = clientRef.current;
-    client.disconnect();
-
-    const wavRecorder = wavRecorderRef.current;
-    await wavRecorder.end();
-
-    const wavStreamPlayer = wavStreamPlayerRef.current;
-    await wavStreamPlayer.interrupt();
-  }, []);
-
-  const deleteConversationItem = useCallback(async (id: string) => {
-    const client = clientRef.current;
-    client.deleteItem(id);
-  }, []);
-
-  /**
-   * In push-to-talk mode, start recording
-   * .appendInputAudio() for each sample
-   */
-  const startRecording = async () => {
-    if (isRecording) {
-      console.warn('Recording already in progress');
-      return;
-    }
-
-    setIsRecording(true);
-    const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    const wavStreamPlayer = wavStreamPlayerRef.current;
-
-    const trackSampleOffset = await wavStreamPlayer.interrupt();
-    if (trackSampleOffset?.trackId) {
-      const { trackId, offset } = trackSampleOffset;
-      await client.cancelResponse(trackId, offset);
-    }
-
-    // Start recording
-    await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-  };
-
-  /**
-   * In push-to-talk mode, stop recording
-   */
-  const stopRecording = async () => {
-    setIsRecording(false);
-    const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    await wavRecorder.pause();
-    client.createResponse();
-  };
-
-  /**
-   * Switch between Manual <> VAD mode for communication
-   */
- useEffect(() => {
-  const client = clientRef.current;
-  const wavRecorder = wavRecorderRef.current;
-
-  // Imposta sempre la modalità VAD
-  client.updateSession({
-    turn_detection: { type: 'server_vad' },
-  });
-
-  if (client.isConnected()) {
-    wavRecorder.record((data) => client.appendInputAudio(data.mono));
-  }
-
-  // Disabilita manualmente il push-to-talk
-  setCanPushToTalk(false);
-}, []);
-
-  /**
    * Auto-scroll the event logs
    */
   useEffect(() => {
     if (eventsScrollRef.current) {
       const eventsEl = eventsScrollRef.current;
       const scrollHeight = eventsEl.scrollHeight;
+      // Only scroll if height has just changed
       if (scrollHeight !== eventsScrollHeightRef.current) {
         eventsEl.scrollTop = scrollHeight;
         eventsScrollHeightRef.current = scrollHeight;
@@ -281,89 +152,7 @@ export function ConsolePage() {
   }, [items]);
 
   /**
-   * Set up render loops for the visualization canvas
-   */
-useEffect(() => {
-  if (!isConnected) {
-    console.log('Connecting to Realtime API automatically...');
-    connectConversation()
-      .then(() => console.log('Connected successfully.'))
-      .catch((error) => {
-        console.error('Failed to auto-connect:', error);
-      });
-  }
-}, [isConnected, connectConversation]);
-
-  useEffect(() => {
-    let isLoaded = true;
-
-    const wavRecorder = wavRecorderRef.current;
-    const clientCanvas = clientCanvasRef.current;
-    let clientCtx: CanvasRenderingContext2D | null = null;
-
-    const wavStreamPlayer = wavStreamPlayerRef.current;
-    const serverCanvas = serverCanvasRef.current;
-    let serverCtx: CanvasRenderingContext2D | null = null;
-
-    const render = () => {
-      if (isLoaded) {
-        if (clientCanvas) {
-          if (!clientCanvas.width || !clientCanvas.height) {
-            clientCanvas.width = clientCanvas.offsetWidth;
-            clientCanvas.height = clientCanvas.offsetHeight;
-          }
-          clientCtx = clientCtx || clientCanvas.getContext('2d');
-          if (clientCtx) {
-            clientCtx.clearRect(0, 0, clientCanvas.width, clientCanvas.height);
-            const result = wavRecorder.recording
-              ? wavRecorder.getFrequencies('voice')
-              : { values: new Float32Array([0]) };
-            WavRenderer.drawBars(
-              clientCanvas,
-              clientCtx,
-              result.values,
-              '#0099ff',
-              10,
-              0,
-              8
-            );
-          }
-        }
-        if (serverCanvas) {
-          if (!serverCanvas.width || !serverCanvas.height) {
-            serverCanvas.width = serverCanvas.offsetWidth;
-            serverCanvas.height = serverCanvas.offsetHeight;
-          }
-          serverCtx = serverCtx || serverCanvas.getContext('2d');
-          if (serverCtx) {
-            serverCtx.clearRect(0, 0, serverCanvas.width, serverCanvas.height);
-            const result = wavStreamPlayer.analyser
-              ? wavStreamPlayer.getFrequencies('voice')
-              : { values: new Float32Array([0]) };
-            WavRenderer.drawBars(
-              serverCanvas,
-              serverCtx,
-              result.values,
-              '#009900',
-              10,
-              0,
-              8
-            );
-          }
-        }
-        window.requestAnimationFrame(render);
-      }
-    };
-    render();
-
-    return () => {
-      isLoaded = false;
-    };
-  }, []);
-
-  /**
    * Core RealtimeClient and audio capture setup
-   * Set all of our instructions, tools, events and more
    */
   useEffect(() => {
     const wavStreamPlayer = wavStreamPlayerRef.current;
@@ -373,37 +162,6 @@ useEffect(() => {
     client.updateSession({ instructions: instructions });
     client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
 
-    client.addTool(
-      {
-        name: 'set_memory',
-        description: 'Saves important data about the user into memory.',
-        parameters: {
-          type: 'object',
-          properties: {
-            key: {
-              type: 'string',
-              description:
-                'The key of the memory value. Always use lowercase and underscores, no other characters.',
-            },
-            value: {
-              type: 'string',
-              description: 'Value can be anything represented as a string',
-            },
-          },
-          required: ['key', 'value'],
-        },
-      },
-      async ({ key, value }: { [key: string]: any }) => {
-        setMemoryKv((memoryKv) => {
-          const newKv = { ...memoryKv };
-          newKv[key] = value;
-          return newKv;
-        });
-        return { ok: true };
-      }
-    );
-
-    // handle realtime events from client + server for event logging
     client.on('realtime.event', (realtimeEvent: RealtimeEvent) => {
       setRealtimeEvents((realtimeEvents) => {
         const lastEvent = realtimeEvents[realtimeEvents.length - 1];
@@ -423,9 +181,6 @@ useEffect(() => {
     };
   }, []);
 
-  /**
-   * Render the application
-   */
   return (
     <div data-component="ConsolePage">
       <div className="content-top">
@@ -496,3 +251,4 @@ useEffect(() => {
     </div>
   );
 }
+
