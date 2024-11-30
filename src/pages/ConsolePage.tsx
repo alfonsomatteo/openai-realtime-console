@@ -70,8 +70,8 @@ export function ConsolePage() {
   const startRecording = async () => {
     const wavRecorder = wavRecorderRef.current;
 
-    // Check if recording is already active
-    if (wavRecorder.isRecording()) {
+    // Check if recording is already active using 'recording' property
+    if (wavRecorder.recording) {
       await wavRecorder.pause(); // Pause the recording first
     }
 
@@ -133,5 +133,4 @@ export function ConsolePage() {
     </div>
   );
 }
-
 
