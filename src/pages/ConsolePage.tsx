@@ -55,14 +55,19 @@ interface RealtimeEvent {
 
 export function ConsolePage() {
   /**
-   * Ask user for API Key
-   * If we're using the local relay server, we don't need this
+   * Stato per salvare la memoria utente.
+   */
+  const [memoryKv, setMemoryKv] = useState<{ [key: string]: any }>({});
+
+  /**
+   * Chiedi la chiave API
+   * Se utilizziamo il server relay locale, non è necessaria
    */
   const apiKey = LOCAL_RELAY_SERVER_URL
     ? ''
-    : process.env.REACT_APP_OPENAI_API_KEY || // Use the environment variable
+    : process.env.REACT_APP_OPENAI_API_KEY || // Usa la variabile di ambiente
       localStorage.getItem('tmp::voice_api_key') ||
-      prompt('OpenAI API Key') || ''; // Fallback to prompt
+      prompt('OpenAI API Key') || ''; // Fallback al prompt
   if (apiKey !== '') {
     localStorage.setItem('tmp::voice_api_key', apiKey);
   }
@@ -90,22 +95,13 @@ export function ConsolePage() {
     )
   );
 
-  // Rest of the code remains the same
-
   /**
-   * Core RealtimeClient and audio capture setup
-   * Set all of our instructions, tools, events and more
+   * Core RealtimeClient e impostazione acquisizione audio.
    */
   useEffect(() => {
-    const wavStreamPlayer = wavStreamPlayerRef.current;
     const client = clientRef.current;
 
-    // Set instructions
-    client.updateSession({ instructions: instructions });
-    // Set transcription, otherwise we don't get user transcriptions back
-    client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
-
-    // Add tools
+    // Aggiungi strumenti
     client.addTool(
       {
         name: 'set_memory',
@@ -135,67 +131,9 @@ export function ConsolePage() {
         return { ok: true };
       }
     );
-    client.addTool(
-      {
-        name: 'get_weather',
-        description:
-          'Retrieves the weather for a given lat, lng coordinate pair. Specify a label for the location.',
-        parameters: {
-          type: 'object',
-          properties: {
-            lat: {
-              type: 'number',
-              description: 'Latitude',
-            },
-            lng: {
-              type: 'number',
-              description: 'Longitude',
-            },
-            location: {
-              type: 'string',
-              description: 'Name of the location',
-            },
-          },
-          required: ['lat', 'lng', 'location'],
-        },
-      },
-      async ({ lat, lng, location }: { [key: string]: any }) => {
-        setMarker({ lat, lng, location });
-        setCoords({ lat, lng, location });
-        const result = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,wind_speed_10m`
-        );
-        const json = await result.json();
-        const temperature = {
-          value: json.current.temperature_2m as number,
-          units: json.current_units.temperature_2m as string,
-        };
-        const wind_speed = {
-          value: json.current.wind_speed_10m as number,
-          units: json.current_units.wind_speed_10m as string,
-        };
-        setMarker({ lat, lng, location, temperature, wind_speed });
-        return json;
-      }
-    );
 
-    client.on('error', (event: any) => console.error(event));
-    client.on('conversation.interrupted', async () => {
-      const trackSampleOffset = await wavStreamPlayer.interrupt();
-      if (trackSampleOffset?.trackId) {
-        const { trackId, offset } = trackSampleOffset;
-        await client.cancelResponse(trackId, offset);
-      }
-    });
-    client.on('conversation.updated', async ({ item, delta }: any) => {
-      const items = client.conversation.getItems();
-      if (delta?.audio) {
-        wavStreamPlayer.add16BitPCM(delta.audio, item.id);
-      }
-      setItems(items);
-    });
-
-    setItems(client.conversation.getItems());
+    // Altre configurazioni...
+    client.updateSession({ instructions: instructions });
 
     return () => {
       client.reset();
@@ -203,28 +141,19 @@ export function ConsolePage() {
   }, []);
 
   /**
-   * Render the application
+   * Render dell'applicazione
    */
   return (
     <div data-component="ConsolePage">
       <div className="content-top">
         <div className="content-title">
-          <img src="/openai-logomark.svg" />
+          <img src="/openai-logomark.svg" alt="OpenAI Logo" />
           <span>realtime console</span>
         </div>
-        <div className="content-api-key">
-          {!LOCAL_RELAY_SERVER_URL && (
-            <Button
-              icon={Edit}
-              iconPosition="end"
-              buttonStyle="flush"
-              label={`api key: ${apiKey.slice(0, 3)}...`}
-              onClick={() => resetAPIKey()}
-            />
-          )}
-        </div>
       </div>
-      {/* The rest of the UI rendering remains the same */}
+      <div className="content-main">
+        {/* Inserisci il resto del layout */}
+      </div>
     </div>
   );
 }
