@@ -12,9 +12,57 @@
     flex-shrink: 0;
   }
 
+
+
+
+
+  
  
+/* Nascondi tutto tranne la navbar con il logo */
+body {
+  margin: 0;
+  padding: 0;
+}
+
+#root > div[data-component="ConsolePage"] {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.content-top {
+  display: block; /* Mostra la navbar */
+}
+
+.content-main,
+.content-right,
+.content-actions,
+.content-logs,
+.content-block,
+.content-block-body,
+.content-block-title,
+.content-block-title.bottom,
+.content-block-body.full,
+.content-block-body.content-kv,
+.content-item {
+  display: none; /* Nascondi tutto il resto */
+}
+
+.content-top img {
+  display: inline-block; /* Mostra solo l'immagine del logo */
+}
 
 
+
+
+
+
+
+
+
+
+
+  
   
 
   .spacer {
